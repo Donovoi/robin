@@ -2,13 +2,18 @@ import copy
 import os
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from dotenv import load_dotenv
 from edison_client import EdisonClient, JobNames
-from lmi import LiteLLMModel
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
+from .opencode_llm import (
+    DEFAULT_OPENCODE_MODEL,
+    DEFAULT_OPENCODE_VARIANT,
+    OpenCodeLLMModel,
+    RobinLLMClient,
+)
 from .prompts import (
     ANALYSIS_QUERIES,
     ASSAY_HYPOTHESIS_FORMAT,
@@ -48,9 +53,9 @@ load_dotenv()
 _DEFAULT_LLM_CONFIG_DATA = {
     "model_list": [
         {
-            "model_name": "o4-mini",
+            "model_name": DEFAULT_OPENCODE_MODEL,
             "litellm_params": {
-                "model": "o4-mini",
+                "model": DEFAULT_OPENCODE_MODEL,
                 "api_key": "",
                 "timeout": 300,
             },
@@ -292,11 +297,29 @@ class RobinConfiguration(BaseModel):
         ),
     )
     edison_api_key: str = "insert_edison_api_key_here"
-    llm_name: str = "o4-mini"
-    llm_config: dict | None = Field(default_factory=get_default_llm_config)
+    llm_backend: Literal["opencode", "litellm"] = Field(
+        default="opencode",
+        description=(
+            "Backend for direct LLM calls. The default uses OpenCode provider auth,"
+            " which supports OAuth-backed OpenAI credentials."
+        ),
+    )
+    llm_name: str = DEFAULT_OPENCODE_MODEL
+    llm_variant: str | None = Field(
+        default=DEFAULT_OPENCODE_VARIANT,
+        description=(
+            "OpenCode model variant. For OpenAI reasoning models, 'xhigh' maps to"
+            " extra-high reasoning."
+        ),
+    )
+    opencode_command: str = Field(
+        default="opencode",
+        description="OpenCode CLI command used when llm_backend='opencode'.",
+    )
+    llm_config: dict | None = None
     agent_settings: AgentConfig = Field(default_factory=AgentConfig)
     _edison_client: EdisonClient | None = PrivateAttr(default=None)
-    _llm_client: LiteLLMModel | None = PrivateAttr(default=None)
+    _llm_client: RobinLLMClient | None = PrivateAttr(default=None)
 
     @model_validator(mode="after")
     def set_run_folder_name_default(self) -> "RobinConfiguration":
@@ -319,9 +342,21 @@ class RobinConfiguration(BaseModel):
         return self._edison_client
 
     @property
-    def llm_client(self) -> LiteLLMModel:
+    def llm_client(self) -> RobinLLMClient:
         if self._llm_client is None:
-            self._llm_client = LiteLLMModel(name=self.llm_name, config=self.llm_config)
+            if self.llm_backend == "opencode":
+                self._llm_client = OpenCodeLLMModel(
+                    model=self.llm_name,
+                    variant=self.llm_variant,
+                    command=self.opencode_command,
+                )
+            else:
+                from lmi import LiteLLMModel
+
+                llm_config = self.llm_config or get_default_llm_config()
+                self._llm_client = LiteLLMModel(
+                    name=self.llm_name, config=llm_config
+                )
         return self._llm_client
 
     def get_da_client(self):

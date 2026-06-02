@@ -7,7 +7,8 @@ See our [blog](https://www.futurehouse.org/research-announcements/demonstrating-
 - **Python:** Version 3.12 or higher.
 - **API Keys:**
   - `EDISON_API_KEY`: For accessing Edison platform agents (Crow, Falcon - now called 'Literature'). Obtain from https://platform.edisonscientific.com/profile. You must first create an Edison profile, purchase credits and then create an API key (Account -> Profile -> API Tokens).
-  - An API key for your chosen LLM provider (e.g., `OPENAI_API_KEY` if using OpenAI models). Robin uses LiteLLM, so it can support various providers.
+  - Robin's default LLM path uses OpenCode provider authentication for OpenAI, so it does not require an `OPENAI_API_KEY`. Run `opencode auth login` and choose OpenAI, then verify with `opencode auth list`.
+  - If you explicitly switch `RobinConfiguration(llm_backend="litellm")`, provide the credentials required by your LiteLLM provider.
   - The data analysis portion of this repo requires access to the Edison platform. Without access, all the hypothesis and experiment generation code can still be run.
 
 ## Docker (Alternative Setup)
@@ -28,16 +29,18 @@ For a fully self-contained environment that avoids OS-level dependency conflicts
 
    ```bash
    cp .env.example .env
-   # Edit .env and fill in your EDISON_API_KEY and OPENAI_API_KEY
+   # Edit .env and fill in your EDISON_API_KEY
    ```
 
-   Important: do **not** wrap values in quotes (e.g. `OPENAI_API_KEY=sk-abc123`, not `OPENAI_API_KEY="sk-abc123"`). Docker reads the file differently from Python and will include the quotes as part of the key.
+   Important: do **not** wrap values in quotes (e.g. `EDISON_API_KEY=abc123`, not `EDISON_API_KEY="abc123"`). Docker reads the file differently from Python and will include the quotes as part of the key.
 
 3. **Run Jupyter:**
    ```bash
    docker run -p 8888:8888 --env-file .env robin
    ```
    Jupyter will print three URLs — use only the one that starts with `http://127.0.0.1:8888/` (the other two are internal container addresses and will not work). Your URL will look like: `http://127.0.0.1:8888/lab/tree/robin_demo.ipynb?token=...`
+
+   Note: Robin's default OpenAI model path uses the local `opencode` command and its provider auth. Docker containers do not automatically inherit the host's OpenCode OAuth session, so either authenticate OpenCode inside the container or run Robin locally for the OAuth-backed default.
 
 ---
 
@@ -78,12 +81,21 @@ For a fully self-contained environment that avoids OS-level dependency conflicts
     ```
 
 4.  **Set API Keys:**
-    Copy the provided template and fill in your keys:
+    Copy the provided template and fill in your Edison key:
     ```bash
     cp .env.example .env
-    # Then edit .env with your actual keys
+    # Then edit .env with your actual Edison key
     ```
-    Robin will automatically load this `.env` file at startup. Alternatively, you can export the variables in your shell, or pass them directly when creating the `RobinConfiguration` object.
+    Robin will automatically load this `.env` file at startup. Alternatively, you can export the variable in your shell, or pass it directly when creating the `RobinConfiguration` object.
+
+5.  **Authenticate OpenAI through OpenCode:**
+
+    ```bash
+    opencode auth login
+    opencode auth list
+    ```
+
+    The default Robin LLM backend uses the OpenCode OpenAI provider credential rather than a static API key. `opencode auth list` should show OpenAI as `oauth`.
 
 ## Running Robin via `robin_demo.ipynb`
 
@@ -113,8 +125,8 @@ _In order to run Robin as used in the manuscript, only input the name of a disea
     ```
 
     - **Modify `disease_name`**: Change `"DISEASE_NAME"` to your target disease.
-    - **API Keys**: If you didn't set environment variables, you can provide the keys directly in the `RobinConfiguration` instantiation.
-    - **LLM Choice**: The default is `o4-mini`. You can change `llm_name` and `llm_config` in `RobinConfiguration` if you wish to use a different model supported by LiteLLM (ensure you have the corresponding API key set).
+    - **Edison Key**: If you didn't set `EDISON_API_KEY`, you can provide `edison_api_key` directly in the `RobinConfiguration` instantiation.
+    - **LLM Choice**: The default is `openai/gpt-5.5` through OpenCode OAuth with `llm_variant="xhigh"` for extra-high reasoning. You can change `llm_name`, `llm_variant`, or `llm_backend` in `RobinConfiguration`; use `llm_backend="litellm"` only if you want LiteLLM/API-key behavior.
     - Other parameters like `num_queries`, `num_assays`, `num_candidates` can also be adjusted here if needed.
 
 4.  **Run the Notebook Cells:**

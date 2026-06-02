@@ -14,9 +14,9 @@ import aiofiles
 import pandas as pd
 from aviary.core import Message
 from edison_client import EdisonClient, JobNames, TaskResponse
-from lmi import LiteLLMModel
 from tqdm.asyncio import tqdm_asyncio
 
+from .opencode_llm import RobinLLMClient
 from .prompts import (
     FINAL_REPORT_FORMATTING_SYSTEM_MESSAGE,
     FINAL_REPORT_FORMATTING_USER_MESSAGE,
@@ -585,7 +585,7 @@ async def process_comparison_pair(
     pair: tuple[int, int],
     idx: int,
     semaphore: asyncio.Semaphore,
-    client: LiteLLMModel,
+    client: RobinLLMClient,
     system_prompt: str,
     ranking_prompt_format: str,
     hypothesis_df: pd.DataFrame,
@@ -697,7 +697,7 @@ async def process_comparison_pair(
 
 async def run_comparisons(  # noqa: PLR0912
     pairs_list: list[tuple[int, int]],
-    client: LiteLLMModel,
+    client: RobinLLMClient,
     system_prompt: str,
     ranking_prompt_format: str,
     assay_hypothesis_df: pd.DataFrame,
@@ -819,7 +819,7 @@ async def run_comparisons(  # noqa: PLR0912
 
 
 async def format_single_report(
-    report: dict[str, Any], client: LiteLLMModel
+    report: dict[str, Any], client: RobinLLMClient
 ) -> dict[str, str]:
 
     hypothesis_text = report.get("hypothesis", "").strip()
@@ -856,7 +856,7 @@ async def format_single_report(
 
 
 async def format_final_report(
-    data_list: list[dict[str, Any]], client: LiteLLMModel
+    data_list: list[dict[str, Any]], client: RobinLLMClient
 ) -> list[dict[str, str]]:
 
     tasks = [format_single_report(item, client) for item in data_list]

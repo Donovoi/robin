@@ -8,9 +8,9 @@ import aiofiles
 import choix
 import pandas as pd
 from aviary.core import Message
-from lmi import LiteLLMModel
 
 from .configuration import RobinConfiguration
+from .opencode_llm import RobinLLMClient
 from .utils import (
     call_platform,
     format_assay_ideas,
@@ -247,7 +247,7 @@ async def experimental_assay(configuration: RobinConfiguration) -> str | None:
     # ## Synthesizing goal for candidate generation using specified assay and disease
 
     async def synthesize_candidate_goal(
-        assay_name: str, client: LiteLLMModel
+        assay_name: str, client: RobinLLMClient
     ) -> str | None:
 
         synthesize_user_content = configuration.prompts.synthesize_user_content.format(
