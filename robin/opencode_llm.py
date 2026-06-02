@@ -14,6 +14,14 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_OPENCODE_MODEL = "openai/gpt-5.5"
 DEFAULT_OPENCODE_VARIANT = "xhigh"
+DEFAULT_OPENCODE_AGENT_INSTRUCTIONS = (
+    "Parallelize independent work as aggressively as correctness allows. "
+    "When a task naturally splits into independent research, coding, review, "
+    "or verification subtasks, hand those subtasks off to sub-agents and "
+    "integrate their results instead of doing everything serially. Keep "
+    "shared context explicit, avoid duplicated work, and preserve final "
+    "scientific and engineering accuracy over speed."
+)
 
 
 @dataclass(frozen=True)
@@ -37,15 +45,17 @@ class OpenCodeLLMModel:
         command: str = "opencode",
         cwd: str | Path | None = None,
         timeout: int = 600,
+        agent_instructions: str = DEFAULT_OPENCODE_AGENT_INSTRUCTIONS,
     ) -> None:
         self.model = model
         self.variant = variant
         self.command = command
         self.cwd = Path(cwd) if cwd is not None else None
         self.timeout = timeout
+        self.agent_instructions = agent_instructions
 
     async def call_single(self, messages: Sequence[Message]) -> LLMResponse:
-        prompt = self._format_messages(messages)
+        prompt = self._build_prompt(messages)
         command = [
             self._resolve_command(),
             "run",
@@ -95,9 +105,20 @@ class OpenCodeLLMModel:
 
         return LLMResponse(text=response_text)
 
+    def _build_prompt(self, messages: Sequence[Message]) -> str:
+        return self._format_messages(
+            messages, agent_instructions=self.agent_instructions
+        )
+
     @staticmethod
-    def _format_messages(messages: Sequence[Message]) -> str:
+    def _format_messages(
+        messages: Sequence[Message], *, agent_instructions: str = ""
+    ) -> str:
         formatted_messages = []
+        if agent_instructions.strip():
+            formatted_messages.append(
+                f"SYSTEM:\n{agent_instructions.strip()}"
+            )
         for message in messages:
             role = str(getattr(message, "role", "user")).upper()
             content = getattr(message, "content", "")

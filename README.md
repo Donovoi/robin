@@ -127,6 +127,7 @@ _In order to run Robin as used in the manuscript, only input the name of a disea
     - **Modify `disease_name`**: Change `"DISEASE_NAME"` to your target disease.
     - **Edison Key**: If you didn't set `EDISON_API_KEY`, you can provide `edison_api_key` directly in the `RobinConfiguration` instantiation.
     - **LLM Choice**: The default is `openai/gpt-5.5` through OpenCode OAuth with `llm_variant="xhigh"` for extra-high reasoning. You can change `llm_name`, `llm_variant`, or `llm_backend` in `RobinConfiguration`; use `llm_backend="litellm"` only if you want LiteLLM/API-key behavior.
+    - **OpenCode Agent Behavior**: The default OpenCode-backed LLM calls include `opencode_agent_instructions`, which tells the agent to parallelize independent work and hand off research, coding, review, or verification subtasks to sub-agents when useful. Override or clear this field if you need strictly serial behavior.
     - Other parameters like `num_queries`, `num_assays`, `num_candidates` can also be adjusted here if needed.
 
 4.  **Run the Notebook Cells:**

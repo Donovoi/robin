@@ -9,6 +9,7 @@ from edison_client import EdisonClient, JobNames
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 from .opencode_llm import (
+    DEFAULT_OPENCODE_AGENT_INSTRUCTIONS,
     DEFAULT_OPENCODE_MODEL,
     DEFAULT_OPENCODE_VARIANT,
     OpenCodeLLMModel,
@@ -316,6 +317,13 @@ class RobinConfiguration(BaseModel):
         default="opencode",
         description="OpenCode CLI command used when llm_backend='opencode'.",
     )
+    opencode_agent_instructions: str = Field(
+        default=DEFAULT_OPENCODE_AGENT_INSTRUCTIONS,
+        description=(
+            "Default instruction injected into OpenCode-backed LLM calls to encourage"
+            " parallel execution and useful sub-agent delegation."
+        ),
+    )
     llm_config: dict | None = None
     agent_settings: AgentConfig = Field(default_factory=AgentConfig)
     _edison_client: EdisonClient | None = PrivateAttr(default=None)
@@ -349,6 +357,7 @@ class RobinConfiguration(BaseModel):
                     model=self.llm_name,
                     variant=self.llm_variant,
                     command=self.opencode_command,
+                    agent_instructions=self.opencode_agent_instructions,
                 )
             else:
                 from lmi import LiteLLMModel
