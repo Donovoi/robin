@@ -5,11 +5,30 @@ See our [blog](https://www.futurehouse.org/research-announcements/demonstrating-
 ## Prerequisites
 
 - **Python:** Version 3.12 or higher.
+- **OpenCode:** Install the `opencode` CLI and authenticate OpenAI through provider OAuth:
+
+  ```bash
+  opencode auth login
+  opencode auth list
+  ```
+
+  The default Robin LLM backend uses this OpenCode provider credential. It does not require an `OPENAI_API_KEY`.
 - **API Keys:**
   - `EDISON_API_KEY`: For accessing Edison platform agents (Crow, Falcon - now called 'Literature'). Obtain from https://platform.edisonscientific.com/profile. You must first create an Edison profile, purchase credits and then create an API key (Account -> Profile -> API Tokens).
-  - Robin's default LLM path uses OpenCode provider authentication for OpenAI, so it does not require an `OPENAI_API_KEY`. Run `opencode auth login` and choose OpenAI, then verify with `opencode auth list`.
   - If you explicitly switch `RobinConfiguration(llm_backend="litellm")`, provide the credentials required by your LiteLLM provider.
   - The data analysis portion of this repo requires access to the Edison platform. Without access, all the hypothesis and experiment generation code can still be run.
+
+## Current LLM and agent defaults
+
+Robin's direct LLM calls now default to OpenCode-backed OpenAI provider auth instead of token-based OpenAI API key configuration:
+
+- `llm_backend="opencode"`
+- `llm_name="openai/gpt-5.5"`
+- `llm_variant="xhigh"` for extra-high reasoning
+- `opencode_agent_instructions` tells the agent to parallelize independent work and delegate research, coding, review, or verification subtasks to sub-agents when useful
+- `web_search_url` can point OpenCode agents at a SearXNG `/search` endpoint for current web research
+
+Edison platform agents are still used for Robin's existing literature-search and data-analysis workflows. The SearXNG option is an OpenCode agent research aid; it does not replace Edison-backed literature search.
 
 ## Docker (Alternative Setup)
 
@@ -82,7 +101,7 @@ When `web_search_url` is set, Robin injects that endpoint into the OpenCode prom
 1.  **Clone the Repository:**
 
     ```bash
-    git clone https://github.com/Future-House/robin.git
+    git clone https://github.com/Donovoi/robin.git
     cd robin
     ```
 
