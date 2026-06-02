@@ -2,6 +2,26 @@
 
 See our [blog](https://www.futurehouse.org/research-announcements/demonstrating-end-to-end-scientific-discovery-with-robin-a-multi-agent-system) or [arXiv](https://arxiv.org/abs/2505.13400) preprint for more info.
 
+## What Robin needs from you
+
+Before running Robin or the OpenCode-backed agent, decide these inputs:
+
+1. **Task:** What should the agent work on? For Robin's normal workflow this is usually a disease-focused discovery goal; for engineering tests it can be a repo or algorithm question.
+2. **Scope:** Should the agent run a smoke test, produce a research-only report, modify code, produce a patch, or commit changes?
+3. **Target domain:** What disease, experiment area, repository, algorithm family, or scientific question should the agent focus on?
+4. **Web search:** Should the agent use web search, and which SearXNG `/search` endpoint should it use if enabled?
+5. **Edison access:** Should the workflow use Edison-backed literature and data-analysis agents? Full Robin scientific workflows need `EDISON_API_KEY`; lightweight OpenCode smoke tests do not.
+6. **Output:** What should Robin produce: a notebook run, recommendation memo, benchmark plan, code changes, PR-ready commit, or all of those?
+
+For a quick OpenCode agent test, the minimum useful prompt is:
+
+```text
+Task: Find a better file-search/signature-matching algorithm than bulk_extractor currently uses.
+Scope: Research and produce a recommendation memo first.
+Web search: Use SearXNG.
+Output: Save findings and commit any repo config/doc changes if needed.
+```
+
 ## Prerequisites
 
 - **Python:** Version 3.12 or higher.
