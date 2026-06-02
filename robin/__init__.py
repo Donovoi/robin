@@ -6,6 +6,7 @@ from .opencode_llm import (
     DEFAULT_OPENCODE_AGENT_INSTRUCTIONS,
     DEFAULT_OPENCODE_MODEL,
     DEFAULT_OPENCODE_VARIANT,
+    WEB_SEARCH_INSTRUCTIONS,
     OpenCodeLLMModel,
 )
 
@@ -14,6 +15,7 @@ __all__ = [
     "DEFAULT_OPENCODE_AGENT_INSTRUCTIONS",
     "DEFAULT_OPENCODE_MODEL",
     "DEFAULT_OPENCODE_VARIANT",
+    "WEB_SEARCH_INSTRUCTIONS",
     "OpenCodeLLMModel",
     "RobinConfiguration",
     "data_analysis",

@@ -22,6 +22,12 @@ DEFAULT_OPENCODE_AGENT_INSTRUCTIONS = (
     "shared context explicit, avoid duplicated work, and preserve final "
     "scientific and engineering accuracy over speed."
 )
+WEB_SEARCH_INSTRUCTIONS = (
+    "When web search is needed, prefer the configured SearXNG endpoint at "
+    "{web_search_url}. Query it with the /search API and format=json when "
+    "structured results are useful. Treat search results as leads, then verify "
+    "important claims against primary sources."
+)
 
 
 @dataclass(frozen=True)
@@ -46,6 +52,7 @@ class OpenCodeLLMModel:
         cwd: str | Path | None = None,
         timeout: int = 600,
         agent_instructions: str = DEFAULT_OPENCODE_AGENT_INSTRUCTIONS,
+        web_search_url: str | None = None,
     ) -> None:
         self.model = model
         self.variant = variant
@@ -53,6 +60,7 @@ class OpenCodeLLMModel:
         self.cwd = Path(cwd) if cwd is not None else None
         self.timeout = timeout
         self.agent_instructions = agent_instructions
+        self.web_search_url = web_search_url
 
     async def call_single(self, messages: Sequence[Message]) -> LLMResponse:
         prompt = self._build_prompt(messages)
@@ -107,8 +115,19 @@ class OpenCodeLLMModel:
 
     def _build_prompt(self, messages: Sequence[Message]) -> str:
         return self._format_messages(
-            messages, agent_instructions=self.agent_instructions
+            messages, agent_instructions=self._build_agent_instructions()
         )
+
+    def _build_agent_instructions(self) -> str:
+        instructions = self.agent_instructions.strip()
+        if self.web_search_url:
+            search_instructions = WEB_SEARCH_INSTRUCTIONS.format(
+                web_search_url=self.web_search_url
+            )
+            instructions = "\n\n".join(
+                part for part in [instructions, search_instructions] if part
+            )
+        return instructions
 
     @staticmethod
     def _format_messages(

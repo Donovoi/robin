@@ -74,6 +74,10 @@ def get_default_llm_config() -> dict[str, Any]:
     return data
 
 
+def _default_web_search_url() -> str | None:
+    return os.getenv("ROBIN_WEB_SEARCH_URL") or os.getenv("SEARXNG_SEARCH_URL")
+
+
 def _get_prompt_args(template_string: str) -> set[str]:
     """
     Extracts root variable names from f-string like placeholders (e.g., {variable})
@@ -324,6 +328,14 @@ class RobinConfiguration(BaseModel):
             " parallel execution and useful sub-agent delegation."
         ),
     )
+    web_search_url: str | None = Field(
+        default_factory=_default_web_search_url,
+        description=(
+            "Optional SearXNG /search endpoint made available to OpenCode-backed"
+            " agents for web research. Defaults to ROBIN_WEB_SEARCH_URL or"
+            " SEARXNG_SEARCH_URL when set."
+        ),
+    )
     llm_config: dict | None = None
     agent_settings: AgentConfig = Field(default_factory=AgentConfig)
     _edison_client: EdisonClient | None = PrivateAttr(default=None)
@@ -358,6 +370,7 @@ class RobinConfiguration(BaseModel):
                     variant=self.llm_variant,
                     command=self.opencode_command,
                     agent_instructions=self.opencode_agent_instructions,
+                    web_search_url=self.web_search_url,
                 )
             else:
                 from lmi import LiteLLMModel

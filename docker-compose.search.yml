@@ -1,0 +1,18 @@
+services:
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: robin-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SEARXNG_BASE_URL: "http://127.0.0.1:8080/"
+      SEARXNG_SECRET: "${SEARXNG_SECRET:-robin-local-searxng-change-me}"
+      UWSGI_THREADS: "4"
+      UWSGI_WORKERS: "2"
+    volumes:
+      - ./docker/searxng:/etc/searxng:rw
+      - searxng-cache:/var/cache/searxng
+
+volumes:
+  searxng-cache:

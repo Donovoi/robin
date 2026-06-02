@@ -1,10 +1,13 @@
 from types import SimpleNamespace
 from unittest import TestCase
+from unittest.mock import patch
 
+from robin.configuration import RobinConfiguration
 from robin.opencode_llm import (
     DEFAULT_OPENCODE_AGENT_INSTRUCTIONS,
     DEFAULT_OPENCODE_MODEL,
     DEFAULT_OPENCODE_VARIANT,
+    WEB_SEARCH_INSTRUCTIONS,
     OpenCodeLLMModel,
 )
 
@@ -47,6 +50,39 @@ class OpenCodeLLMModelTest(TestCase):
 
         assert DEFAULT_OPENCODE_AGENT_INSTRUCTIONS in formatted
         assert formatted.endswith("USER:\nReturn JSON.")
+
+    def test_build_prompt_injects_web_search_endpoint_when_configured(self) -> None:
+        client = OpenCodeLLMModel(web_search_url="http://searxng:8080/search")
+
+        formatted = client._build_prompt(
+            [SimpleNamespace(role="user", content="Find current sources.")]
+        )
+
+        assert WEB_SEARCH_INSTRUCTIONS.format(
+            web_search_url="http://searxng:8080/search"
+        ) in formatted
+        assert "format=json" in formatted
+        assert formatted.endswith("USER:\nFind current sources.")
+
+    def test_configuration_passes_web_search_url_to_opencode_client(self) -> None:
+        config = RobinConfiguration(
+            disease_name="example disease",
+            web_search_url="http://127.0.0.1:8080/search",
+        )
+
+        client = config.llm_client
+
+        assert isinstance(client, OpenCodeLLMModel)
+        assert client.web_search_url == "http://127.0.0.1:8080/search"
+
+    def test_configuration_loads_web_search_url_from_environment(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {"ROBIN_WEB_SEARCH_URL": "http://host.docker.internal:8080/search"},
+        ):
+            config = RobinConfiguration(disease_name="example disease")
+
+        assert config.web_search_url == "http://host.docker.internal:8080/search"
 
     def test_extract_text_uses_only_text_events(self) -> None:
         output = "\n".join(

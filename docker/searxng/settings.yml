@@ -1,0 +1,14 @@
+use_default_settings: true
+
+general:
+  instance_name: "Robin local search"
+
+search:
+  formats:
+    - html
+    - json
+
+server:
+  bind_address: "0.0.0.0"
+  port: 8080
+  secret_key: "robin-local-searxng-change-me"

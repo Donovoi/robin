@@ -42,6 +42,39 @@ For a fully self-contained environment that avoids OS-level dependency conflicts
 
    Note: Robin's default OpenAI model path uses the local `opencode` command and its provider auth. Docker containers do not automatically inherit the host's OpenCode OAuth session, so either authenticate OpenCode inside the container or run Robin locally for the OAuth-backed default.
 
+### Local SearXNG for OpenCode agents
+
+Robin can optionally give OpenCode-backed agents a local SearXNG `/search` endpoint for web research. This is separate from Robin's Edison literature-search flow and is intended as an agent search aid for tasks that benefit from current web context.
+
+Start the local SearXNG sidecar:
+
+```bash
+docker compose -f docker-compose.search.yml up -d
+```
+
+The Compose service binds SearXNG to localhost only and enables JSON output for agent use. For host-based Robin/OpenCode runs, use:
+
+```bash
+export ROBIN_WEB_SEARCH_URL=http://127.0.0.1:8080/search
+```
+
+If OpenCode is running inside a separate Docker container on Docker Desktop, use:
+
+```bash
+export ROBIN_WEB_SEARCH_URL=http://host.docker.internal:8080/search
+```
+
+If Robin and SearXNG are attached to the same Compose network, use `http://searxng:8080/search`. You can also pass the URL directly:
+
+```python
+config = RobinConfiguration(
+    disease_name="DISEASE_NAME",
+    web_search_url="http://127.0.0.1:8080/search",
+)
+```
+
+When `web_search_url` is set, Robin injects that endpoint into the OpenCode prompt so agents prefer SearXNG for web search, request `format=json` when structured results are useful, and verify important claims against primary sources.
+
 ---
 
 ## Setup Instructions
@@ -128,6 +161,7 @@ _In order to run Robin as used in the manuscript, only input the name of a disea
     - **Edison Key**: If you didn't set `EDISON_API_KEY`, you can provide `edison_api_key` directly in the `RobinConfiguration` instantiation.
     - **LLM Choice**: The default is `openai/gpt-5.5` through OpenCode OAuth with `llm_variant="xhigh"` for extra-high reasoning. You can change `llm_name`, `llm_variant`, or `llm_backend` in `RobinConfiguration`; use `llm_backend="litellm"` only if you want LiteLLM/API-key behavior.
     - **OpenCode Agent Behavior**: The default OpenCode-backed LLM calls include `opencode_agent_instructions`, which tells the agent to parallelize independent work and hand off research, coding, review, or verification subtasks to sub-agents when useful. Override or clear this field if you need strictly serial behavior.
+    - **Optional Agent Web Search**: Set `web_search_url` or `ROBIN_WEB_SEARCH_URL` to a SearXNG `/search` endpoint when you want OpenCode-backed agents to use local web search during research-heavy calls.
     - Other parameters like `num_queries`, `num_assays`, `num_candidates` can also be adjusted here if needed.
 
 4.  **Run the Notebook Cells:**
