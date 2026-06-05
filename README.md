@@ -10,7 +10,7 @@ Before running Robin or the OpenCode-backed agent, decide these inputs:
 2. **Scope:** Should the agent run a smoke test, produce a research-only report, modify code, produce a patch, or commit changes?
 3. **Target domain:** What disease, experiment area, repository, algorithm family, or scientific question should the agent focus on?
 4. **Web search:** Should the agent use web search, and which SearXNG `/search` endpoint should it use if enabled?
-5. **Edison access:** Should the workflow use Edison-backed literature and data-analysis agents? Full Robin scientific workflows need `EDISON_API_KEY`; lightweight OpenCode smoke tests do not.
+5. **Literature backend:** Should Robin use Edison, or should it use the open literature fallback? `literature_backend="auto"` uses Edison only when a real `EDISON_API_KEY` is configured; otherwise it uses open scholarly APIs plus Robin's OpenCode GPT-5.5 xhigh synthesis path.
 6. **Output:** What should Robin produce: a notebook run, recommendation memo, benchmark plan, code changes, PR-ready commit, or all of those?
 
 For a quick OpenCode agent test, the minimum useful prompt is:
@@ -34,9 +34,12 @@ Output: Save findings and commit any repo config/doc changes if needed.
 
   The default Robin LLM backend uses this OpenCode provider credential. It does not require an `OPENAI_API_KEY`.
 - **API Keys:**
-  - `EDISON_API_KEY`: For accessing Edison platform agents (Crow, Falcon - now called 'Literature'). Obtain from https://platform.edisonscientific.com/profile. You must first create an Edison profile, purchase credits and then create an API key (Account -> Profile -> API Tokens).
+  - `EDISON_API_KEY` (optional): For accessing Edison platform agents (Crow, Falcon - now called 'Literature') and Edison data-analysis workflows. Obtain from https://platform.edisonscientific.com/profile. You must first create an Edison profile, purchase credits and then create an API key (Account -> Profile -> API Tokens).
+  - `ROBIN_LITERATURE_BACKEND`: `auto` (default), `edison`, or `open`. `auto` falls back to open literature research when no real Edison key is present.
+  - `ROBIN_LITERATURE_EMAIL` (recommended): A contact email sent to polite/open scholarly APIs such as OpenAlex, Crossref, and NCBI E-utilities.
+  - `SEMANTIC_SCHOLAR_API_KEY` and `OPENALEX_API_KEY` (optional): Free API keys for higher open-literature rate limits.
   - If you explicitly switch `RobinConfiguration(llm_backend="litellm")`, provide the credentials required by your LiteLLM provider.
-  - The data analysis portion of this repo requires access to the Edison platform. Without access, all the hypothesis and experiment generation code can still be run.
+  - The data analysis portion of this repo requires access to the Edison platform. Without access, literature-backed assay and candidate generation can still run through the open fallback.
 
 ## Current LLM and agent defaults
 
@@ -47,8 +50,37 @@ Robin's direct LLM calls now default to OpenCode-backed OpenAI provider auth ins
 - `llm_variant="xhigh"` for extra-high reasoning
 - `opencode_agent_instructions` tells the agent to parallelize independent work and delegate research, coding, review, or verification subtasks to sub-agents when useful
 - `web_search_url` can point OpenCode agents at a SearXNG `/search` endpoint for current web research
+- `literature_backend="auto"` uses Edison when `EDISON_API_KEY` is real, otherwise it uses Robin's open literature fallback
 
-Edison platform agents are still used for Robin's existing literature-search and data-analysis workflows. The SearXNG option is an OpenCode agent research aid; it does not replace Edison-backed literature search.
+Edison platform agents are still used when explicitly configured or when `literature_backend="auto"` detects a real Edison token. Without a token, Robin literature search uses free open scholarly sources in parallel and asks the configured OpenCode LLM to synthesize only from the retrieved records. The SearXNG option remains an OpenCode agent research aid for broader web context; it should be treated as lead generation and verified against primary sources.
+
+## Open literature fallback
+
+There is no one-for-one free clone of the Edison platform, but the closest free/open pieces are:
+
+- [PaperQA2](https://github.com/Future-House/paper-qa): the closest open-source Edison-style literature QA/RAG package, also from FutureHouse. It can run against local PDFs and LiteLLM-compatible local or hosted models.
+- [OpenScholar](https://github.com/AkariAsai/OpenScholar): an open scientific literature synthesis system with released code, models, datastore, data, and evaluation benchmark.
+- [OpenResearcher](https://github.com/GAIR-NLP/OpenResearcher) and [LangChain Open Deep Research](https://github.com/langchain-ai/open_deep_research): open research-agent frameworks that can be useful as external agents, but they are broader research tools rather than direct Edison replacements.
+- Open scholarly APIs used by Robin's built-in fallback: [OpenAlex](https://developers.openalex.org/api-reference/introduction), [Semantic Scholar Academic Graph](https://api.semanticscholar.org/api-docs), [NCBI E-utilities/PubMed](https://www.ncbi.nlm.nih.gov/home/develop/api/), [Europe PMC](https://europepmc.org/RestfulWebService), [Crossref REST](https://www.crossref.org/documentation/retrieve-metadata/rest-api/), and [arXiv](https://info.arxiv.org/help/api/index.html).
+- Full-text helpers for richer local corpora: [Unpaywall](https://unpaywall.org/products/api), [PubMed Central Open Access](https://pmc.ncbi.nlm.nih.gov/tools/oai/), and [GROBID](https://github.com/grobidOrg/grobid).
+
+Robin's built-in open fallback is designed to preserve research quality when Edison is unavailable:
+
+1. It queries OpenAlex, Semantic Scholar, PubMed, Europe PMC, Crossref, and arXiv in parallel.
+2. It deduplicates records by DOI, PMID, PMCID, arXiv ID, or normalized title.
+3. It ranks evidence toward guidelines, systematic reviews, meta-analyses, randomized trials, primary mechanistic studies, citation support, recency, source agreement, and open-access availability.
+4. It supplies the ranked evidence records to Robin's configured LLM, which defaults to OpenCode `openai/gpt-5.5` with `llm_variant="xhigh"`.
+5. It requires a synthesis with inline record citations, evidence gaps, conflicting evidence, and detractor concerns.
+
+Use `literature_backend="open"` to force this path even when an Edison key is present:
+
+```python
+config = RobinConfiguration(
+    disease_name="DISEASE_NAME",
+    literature_backend="open",
+    open_literature_email="you@example.com",
+)
+```
 
 ## Docker (Alternative Setup)
 
@@ -68,10 +100,10 @@ For a fully self-contained environment that avoids OS-level dependency conflicts
 
    ```bash
    cp .env.example .env
-   # Edit .env and fill in your EDISON_API_KEY
+   # Optional: add EDISON_API_KEY, ROBIN_LITERATURE_EMAIL, or free scholarly API keys
    ```
 
-   Important: do **not** wrap values in quotes (e.g. `EDISON_API_KEY=abc123`, not `EDISON_API_KEY="abc123"`). Docker reads the file differently from Python and will include the quotes as part of the key.
+   Important: do **not** wrap values in quotes (e.g. `EDISON_API_KEY=abc123`, not `EDISON_API_KEY="abc123"`). Docker reads the file differently from Python and will include the quotes as part of the key. If `EDISON_API_KEY` is omitted or left as a placeholder, Robin automatically uses the open literature fallback for literature research.
 
 3. **Run Jupyter:**
    ```bash
@@ -153,12 +185,12 @@ When `web_search_url` is set, Robin injects that endpoint into the OpenCode prom
     ```
 
 4.  **Set API Keys:**
-    Copy the provided template and fill in your Edison key:
+    Copy the provided template and fill in optional credentials:
     ```bash
     cp .env.example .env
-    # Then edit .env with your actual Edison key
+    # Then edit .env if you want Edison or higher open-literature rate limits
     ```
-    Robin will automatically load this `.env` file at startup. Alternatively, you can export the variable in your shell, or pass it directly when creating the `RobinConfiguration` object.
+    Robin will automatically load this `.env` file at startup. Alternatively, you can export variables in your shell, or pass them directly when creating the `RobinConfiguration` object. Without a real Edison key, `literature_backend="auto"` uses the open literature fallback.
 
 5.  **Authenticate OpenAI through OpenCode:**
 
@@ -192,12 +224,16 @@ _In order to run Robin as used in the manuscript, only input the name of a disea
     config = RobinConfiguration(
         disease_name="DISEASE_NAME",  # <-- Customize the disease name here
         # You can also explicitly set API keys here if not using environment variables:
-        # edison_api_key="your_edison_api_key_here"
+        # edison_api_key="your_edison_api_key_here",
+        # literature_backend="auto",
+        # open_literature_email="you@example.com",
     )
     ```
 
     - **Modify `disease_name`**: Change `"DISEASE_NAME"` to your target disease.
-    - **Edison Key**: If you didn't set `EDISON_API_KEY`, you can provide `edison_api_key` directly in the `RobinConfiguration` instantiation.
+    - **Literature Backend**: The default is `literature_backend="auto"`. Robin uses Edison if `EDISON_API_KEY` or `edison_api_key` is real; otherwise it uses the open literature fallback.
+    - **Edison Key**: If you want Edison, set `EDISON_API_KEY` or provide `edison_api_key` directly in the `RobinConfiguration` instantiation.
+    - **Open Literature Email**: Set `open_literature_email` or `ROBIN_LITERATURE_EMAIL` for polite API access when using the open fallback.
     - **LLM Choice**: The default is `openai/gpt-5.5` through OpenCode OAuth with `llm_variant="xhigh"` for extra-high reasoning. You can change `llm_name`, `llm_variant`, or `llm_backend` in `RobinConfiguration`; use `llm_backend="litellm"` only if you want LiteLLM/API-key behavior.
     - **OpenCode Agent Behavior**: The default OpenCode-backed LLM calls include `opencode_agent_instructions`, which tells the agent to parallelize independent work and hand off research, coding, review, or verification subtasks to sub-agents when useful. Override or clear this field if you need strictly serial behavior.
     - **Optional Agent Web Search**: Set `web_search_url` or `ROBIN_WEB_SEARCH_URL` to a SearXNG `/search` endpoint when you want OpenCode-backed agents to use local web search during research-heavy calls.

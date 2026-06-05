@@ -12,7 +12,7 @@ from aviary.core import Message
 from .configuration import RobinConfiguration
 from .opencode_llm import RobinLLMClient
 from .utils import (
-    call_platform,
+    call_literature_backend,
     format_assay_ideas,
     output_to_string,
     processing_ranking_output,
@@ -67,11 +67,14 @@ async def experimental_assay(configuration: RobinConfiguration) -> str | None:
 
     # ### Step 2: Literature review on cell culture assays
 
-    logger.info("\nStep 2: Conducting literature search with Edison platform...")
+    logger.info(
+        "\nStep 2: Conducting literature search with %s backend...",
+        configuration.resolved_literature_backend,
+    )
 
-    assay_lit_review = await call_platform(
+    assay_lit_review = await call_literature_backend(
         queries=experimental_assay_queries_dict,
-        fh_client=configuration.edison_client,
+        configuration=configuration,
         job_name=configuration.agent_settings.assay_lit_search_agent,
     )
 
@@ -181,9 +184,9 @@ async def experimental_assay(configuration: RobinConfiguration) -> str | None:
         assay_idea_list=assay_idea_list
     )
 
-    assay_hypotheses = await call_platform(
+    assay_hypotheses = await call_literature_backend(
         queries=assay_hypothesis_queries,
-        fh_client=configuration.edison_client,
+        configuration=configuration,
         job_name=configuration.agent_settings.assay_hypothesis_report_agent,
     )
 

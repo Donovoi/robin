@@ -10,7 +10,7 @@ from aviary.core import Message
 
 from .configuration import RobinConfiguration
 from .utils import (
-    call_platform,
+    call_literature_backend,
     extract_candidate_info_from_folder,
     format_candidate_ideas,
     format_final_report,
@@ -98,11 +98,14 @@ async def therapeutic_candidates(  # noqa: PLR0912
 
     # ### Step 2: Literature review on therapeutic candidates
 
-    logger.info("\nStep 2: Conducting literature search with Edison platform...")
+    logger.info(
+        "\nStep 2: Conducting literature search with %s backend...",
+        configuration.resolved_literature_backend,
+    )
 
-    therapeutic_candidate_review = await call_platform(
+    therapeutic_candidate_review = await call_literature_backend(
         queries=candidate_generation_queries_dict,
-        fh_client=configuration.edison_client,
+        configuration=configuration,
         job_name=configuration.agent_settings.candidate_lit_search_agent,
     )
 
@@ -304,9 +307,9 @@ async def therapeutic_candidates(  # noqa: PLR0912
         candidate_idea_list=candidate_idea_list
     )
 
-    therapeutic_candidate_hypotheses = await call_platform(
+    therapeutic_candidate_hypotheses = await call_literature_backend(
         queries=therapeutic_candidate_queries,
-        fh_client=configuration.edison_client,
+        configuration=configuration,
         job_name=configuration.agent_settings.candidate_hypothesis_report_agent,
     )
 

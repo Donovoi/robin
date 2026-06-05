@@ -237,6 +237,50 @@ async def call_platform(  # noqa: PLR0912
     }
 
 
+async def call_literature_backend(
+    *, queries: dict[str, str], configuration: Any, job_name: JobNames
+) -> dict[str, Any]:
+    backend = configuration.resolved_literature_backend
+    if backend == "edison":
+        return await call_platform(
+            queries=queries,
+            fh_client=configuration.edison_client,
+            job_name=job_name,
+        )
+
+    from .open_literature import call_open_literature
+
+    return await call_open_literature(
+        queries=queries,
+        llm_client=configuration.llm_client,
+        email=configuration.open_literature_email,
+        semantic_scholar_api_key=configuration.semantic_scholar_api_key,
+        openalex_api_key=configuration.openalex_api_key,
+        max_results_per_source=configuration.open_literature_max_results_per_source,
+        max_evidence_records=configuration.open_literature_max_evidence_records,
+        timeout=configuration.open_literature_timeout,
+        max_concurrent_queries=configuration.open_literature_max_concurrent_queries,
+    )
+
+
+def _backend_trace(item: dict[str, Any]) -> str:
+    trajectory_url = str(item.get("trajectory_url", "")).strip()
+    if trajectory_url:
+        return f"Full trajectory link: {trajectory_url}"
+
+    task_id_text = str(item.get("task_run_id", "")).strip()
+    if not task_id_text:
+        return "Research backend trace: unavailable"
+
+    if task_id_text.startswith("open-literature:"):
+        return f"Research backend trace: {task_id_text}"
+
+    return (
+        "Full trajectory link:"
+        f" https://platform.edisonscientific.com/trajectories/{task_id_text}"
+    )
+
+
 def save_crow_files(
     data_list: list[dict[str, Any]],
     run_dir: str | Path,
@@ -251,7 +295,6 @@ def save_crow_files(
         query_text = item.get("query", "").strip()
         answer_text = item.get("answer", "").strip()
         sources_text = item.get("sources", "").strip()
-        task_id_text = item.get("task_run_id", "").strip()
 
         file_number = i + 1
 
@@ -275,7 +318,7 @@ def save_crow_files(
             content = f"Hypothesis: {hypothesis_text}\n\n"
         content += f"Query: {query_text}\n\n"
         content += f"{answer_text}\n\n"
-        content += f"Full trajectory link: https://platform.edisonscientific.com/trajectories/{task_id_text}\n\n"
+        content += f"{_backend_trace(item)}\n\n"
         content += f"References:\n{sources_text}\n"
 
         try:
@@ -299,7 +342,6 @@ def save_falcon_files(
     for i, item in enumerate(data_list):
         hypothesis_text = item.get("hypothesis", "").strip()
         formatted_output_text = item.get("formatted_output", "").strip()
-        task_id_text = item.get("task_run_id", "").strip()
 
         file_number = i + 1
 
@@ -320,7 +362,7 @@ def save_falcon_files(
 
         content = f"Proposal for {hypothesis_text}\n\n"
         content += f"{formatted_output_text}\n\n"
-        content += f"Full trajectory link: https://platform.edisonscientific.com/trajectories/{task_id_text}\n"
+        content += f"{_backend_trace(item)}\n"
 
         try:
             filepath.write_text(content, encoding="utf-8")
@@ -849,10 +891,15 @@ async def format_single_report(
 
     final_report_formatted_result = await client.call_single(formatting_messages)
 
-    return {
+    formatted_report = {
         "hypothesis": hypothesis_text,
         "formatted_output": cast(str, final_report_formatted_result.text),
     }
+    if report.get("task_run_id"):
+        formatted_report["task_run_id"] = str(report.get("task_run_id"))
+    if report.get("trajectory_url"):
+        formatted_report["trajectory_url"] = str(report.get("trajectory_url"))
+    return formatted_report
 
 
 async def format_final_report(

@@ -51,6 +51,14 @@ from .prompts import (
 
 load_dotenv()
 
+_EDISON_PLACEHOLDERS = {
+    "",
+    "insert_edison_api_key_here",
+    "your_edison_api_key_here",
+    "none",
+    "null",
+}
+
 _DEFAULT_LLM_CONFIG_DATA = {
     "model_list": [
         {
@@ -76,6 +84,33 @@ def get_default_llm_config() -> dict[str, Any]:
 
 def _default_web_search_url() -> str | None:
     return os.getenv("ROBIN_WEB_SEARCH_URL") or os.getenv("SEARXNG_SEARCH_URL")
+
+
+def _default_literature_backend() -> str:
+    return os.getenv("ROBIN_LITERATURE_BACKEND", "auto")
+
+
+def _default_open_literature_email() -> str | None:
+    return (
+        os.getenv("ROBIN_LITERATURE_EMAIL")
+        or os.getenv("OPENALEX_MAILTO")
+        or os.getenv("UNPAYWALL_EMAIL")
+        or os.getenv("NCBI_EMAIL")
+    )
+
+
+def _optional_env(name: str) -> str | None:
+    value = os.getenv(name)
+    return value.strip() if value and value.strip() else None
+
+
+def _clean_secret(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if cleaned.lower() in _EDISON_PLACEHOLDERS:
+        return None
+    return cleaned
 
 
 def _get_prompt_args(template_string: str) -> set[str]:
@@ -301,7 +336,14 @@ class RobinConfiguration(BaseModel):
             "using the disease_name and the timestamp."
         ),
     )
-    edison_api_key: str = "insert_edison_api_key_here"
+    edison_api_key: str | None = None
+    literature_backend: Literal["auto", "edison", "open"] = Field(
+        default_factory=_default_literature_backend,
+        description=(
+            "Literature research backend. 'auto' uses Edison when a real key is"
+            " configured and otherwise falls back to open literature APIs."
+        ),
+    )
     llm_backend: Literal["opencode", "litellm"] = Field(
         default="opencode",
         description=(
@@ -336,6 +378,49 @@ class RobinConfiguration(BaseModel):
             " SEARXNG_SEARCH_URL when set."
         ),
     )
+    open_literature_email: str | None = Field(
+        default_factory=_default_open_literature_email,
+        description=(
+            "Optional contact email sent to polite/open scholarly APIs such as"
+            " OpenAlex, Crossref, and NCBI E-utilities."
+        ),
+    )
+    semantic_scholar_api_key: str | None = Field(
+        default_factory=lambda: _optional_env("SEMANTIC_SCHOLAR_API_KEY"),
+        description=(
+            "Optional free Semantic Scholar API key for higher rate limits in the"
+            " open literature fallback."
+        ),
+    )
+    openalex_api_key: str | None = Field(
+        default_factory=lambda: _optional_env("OPENALEX_API_KEY"),
+        description=(
+            "Optional free OpenAlex API key for higher rate limits in the open"
+            " literature fallback."
+        ),
+    )
+    open_literature_max_results_per_source: int = Field(
+        default=8,
+        ge=1,
+        description=(
+            "Maximum records retrieved from each open literature source per query."
+        ),
+    )
+    open_literature_max_evidence_records: int = Field(
+        default=15,
+        ge=1,
+        description="Maximum deduplicated records supplied to the synthesis LLM.",
+    )
+    open_literature_timeout: float = Field(
+        default=20.0,
+        gt=0,
+        description="HTTP timeout for each open literature API call.",
+    )
+    open_literature_max_concurrent_queries: int = Field(
+        default=4,
+        ge=1,
+        description="Maximum open literature query syntheses running at once.",
+    )
     llm_config: dict | None = None
     agent_settings: AgentConfig = Field(default_factory=AgentConfig)
     _edison_client: EdisonClient | None = PrivateAttr(default=None)
@@ -350,9 +435,31 @@ class RobinConfiguration(BaseModel):
         return self
 
     @property
+    def resolved_edison_api_key(self) -> str | None:
+        return _clean_secret(os.getenv("EDISON_API_KEY")) or _clean_secret(
+            self.edison_api_key
+        )
+
+    @property
+    def has_edison_api_key(self) -> bool:
+        return self.resolved_edison_api_key is not None
+
+    @property
+    def resolved_literature_backend(self) -> Literal["edison", "open"]:
+        if self.literature_backend == "auto":
+            return "edison" if self.has_edison_api_key else "open"
+        if self.literature_backend == "edison" and not self.has_edison_api_key:
+            raise ValueError(
+                "literature_backend='edison' was requested, but no real"
+                " EDISON_API_KEY was configured. Set EDISON_API_KEY or use"
+                " literature_backend='auto'/'open'."
+            )
+        return self.literature_backend
+
+    @property
     def edison_client(self) -> EdisonClient:
         if self._edison_client is None:
-            api_key = os.getenv("EDISON_API_KEY") or self.edison_api_key
+            api_key = self.resolved_edison_api_key
             if not api_key:
                 raise ValueError(
                     "Edison API key is not set. Please provide it in the"

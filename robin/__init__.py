@@ -9,6 +9,7 @@ from .opencode_llm import (
     WEB_SEARCH_INSTRUCTIONS,
     OpenCodeLLMModel,
 )
+from .open_literature import OpenLiteratureSearcher, call_open_literature
 
 # Define the public API for 'from src import *'
 __all__ = [
@@ -17,7 +18,9 @@ __all__ = [
     "DEFAULT_OPENCODE_VARIANT",
     "WEB_SEARCH_INSTRUCTIONS",
     "OpenCodeLLMModel",
+    "OpenLiteratureSearcher",
     "RobinConfiguration",
+    "call_open_literature",
     "data_analysis",
     "experimental_assay",
     "therapeutic_candidates",
