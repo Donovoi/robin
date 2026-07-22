@@ -49,6 +49,7 @@ Robin's direct LLM calls now default to OpenCode-backed OpenAI provider auth ins
 - `llm_name="openai/gpt-5.5"`
 - `llm_variant="xhigh"` for extra-high reasoning
 - `opencode_agent_instructions` tells the agent to parallelize independent work and delegate research, coding, review, or verification subtasks to sub-agents when useful
+- `opencode_agent` can select a constrained project agent with OpenCode's `--agent` option for domain-specific calls
 - `web_search_url` can point OpenCode agents at a SearXNG `/search` endpoint for current web research
 - `literature_backend="auto"` uses Edison when `EDISON_API_KEY` is real, otherwise it uses Robin's open literature fallback
 
@@ -141,6 +142,7 @@ If Robin and SearXNG are attached to the same Compose network, use `http://searx
 config = RobinConfiguration(
     disease_name="DISEASE_NAME",
     web_search_url="http://127.0.0.1:8080/search",
+    # opencode_agent="bounded-researcher",
 )
 ```
 

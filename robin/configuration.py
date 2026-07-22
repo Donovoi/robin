@@ -363,6 +363,13 @@ class RobinConfiguration(BaseModel):
         default="opencode",
         description="OpenCode CLI command used when llm_backend='opencode'.",
     )
+    opencode_agent: str | None = Field(
+        default=None,
+        description=(
+            "Optional OpenCode agent selected with --agent for constrained or"
+            " domain-specific direct LLM calls."
+        ),
+    )
     opencode_agent_instructions: str = Field(
         default=DEFAULT_OPENCODE_AGENT_INSTRUCTIONS,
         description=(
@@ -476,6 +483,7 @@ class RobinConfiguration(BaseModel):
                     model=self.llm_name,
                     variant=self.llm_variant,
                     command=self.opencode_command,
+                    agent=self.opencode_agent,
                     agent_instructions=self.opencode_agent_instructions,
                     web_search_url=self.web_search_url,
                 )

@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from robin.configuration import RobinConfiguration
 from robin.opencode_llm import (
@@ -74,6 +74,42 @@ class OpenCodeLLMModelTest(TestCase):
 
         assert isinstance(client, OpenCodeLLMModel)
         assert client.web_search_url == "http://127.0.0.1:8080/search"
+
+    def test_configuration_passes_agent_to_opencode_client(self) -> None:
+        config = RobinConfiguration(
+            disease_name="example disease",
+            opencode_agent="bounded-researcher",
+        )
+
+        client = config.llm_client
+
+        assert isinstance(client, OpenCodeLLMModel)
+        assert client.agent == "bounded-researcher"
+
+    def test_call_single_selects_configured_agent(self) -> None:
+        process = MagicMock()
+        process.returncode = 0
+        process.communicate = AsyncMock(
+            return_value=(b'{"type":"text","part":{"text":"ok"}}\n', b"")
+        )
+        client = OpenCodeLLMModel(agent="bounded-researcher")
+
+        async def run_call() -> None:
+            with patch(
+                "robin.opencode_llm.asyncio.create_subprocess_exec",
+                new=AsyncMock(return_value=process),
+            ) as create_process:
+                response = await client.call_single(
+                    [SimpleNamespace(role="user", content="Research this.")]
+                )
+
+            command = create_process.await_args.args
+            assert command[-2:] == ("--agent", "bounded-researcher")
+            assert response.text == "ok"
+
+        import asyncio
+
+        asyncio.run(run_call())
 
     def test_configuration_loads_web_search_url_from_environment(self) -> None:
         with patch.dict(
