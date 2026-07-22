@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from aviary.core import Message
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_OPENCODE_MODEL = "openai/gpt-5.5"
@@ -36,8 +34,15 @@ class LLMResponse:
 
 
 class RobinLLMClient(Protocol):
-    async def call_single(self, messages: Sequence[Message]) -> LLMResponse:
+    async def call_single(self, messages: Sequence["MessageLike"]) -> LLMResponse:
         """Return one LLM response for a message list."""
+
+
+class MessageLike(Protocol):
+    """Minimal message interface accepted by the OpenCode adapter."""
+
+    role: str
+    content: str
 
 
 class OpenCodeLLMModel:
@@ -49,6 +54,7 @@ class OpenCodeLLMModel:
         model: str = DEFAULT_OPENCODE_MODEL,
         variant: str | None = DEFAULT_OPENCODE_VARIANT,
         command: str = "opencode",
+        agent: str | None = None,
         cwd: str | Path | None = None,
         timeout: int = 600,
         agent_instructions: str = DEFAULT_OPENCODE_AGENT_INSTRUCTIONS,
@@ -57,12 +63,13 @@ class OpenCodeLLMModel:
         self.model = model
         self.variant = variant
         self.command = command
+        self.agent = agent
         self.cwd = Path(cwd) if cwd is not None else None
         self.timeout = timeout
         self.agent_instructions = agent_instructions
         self.web_search_url = web_search_url
 
-    async def call_single(self, messages: Sequence[Message]) -> LLMResponse:
+    async def call_single(self, messages: Sequence[MessageLike]) -> LLMResponse:
         prompt = self._build_prompt(messages)
         command = [
             self._resolve_command(),
@@ -74,6 +81,8 @@ class OpenCodeLLMModel:
         ]
         if self.variant:
             command.extend(["--variant", self.variant])
+        if self.agent:
+            command.extend(["--agent", self.agent])
 
         process = await asyncio.create_subprocess_exec(
             *command,
@@ -113,7 +122,7 @@ class OpenCodeLLMModel:
 
         return LLMResponse(text=response_text)
 
-    def _build_prompt(self, messages: Sequence[Message]) -> str:
+    def _build_prompt(self, messages: Sequence[MessageLike]) -> str:
         return self._format_messages(
             messages, agent_instructions=self._build_agent_instructions()
         )
@@ -131,7 +140,7 @@ class OpenCodeLLMModel:
 
     @staticmethod
     def _format_messages(
-        messages: Sequence[Message], *, agent_instructions: str = ""
+        messages: Sequence[MessageLike], *, agent_instructions: str = ""
     ) -> str:
         formatted_messages = []
         if agent_instructions.strip():
